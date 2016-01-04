@@ -3970,7 +3970,7 @@ CONFIG_QMI_ENCDEC=y
 ###########################
 
 # Kernelversion
-CONFIG_LOCALVERSION="-StormySea-2.1"
+CONFIG_LOCALVERSION="-STORMY-HIGHWIND"
 # CONFIG_LOCALVERSION_AUTO is not set
 
 # Hotplug
