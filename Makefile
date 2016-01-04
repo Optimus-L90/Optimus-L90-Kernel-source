@@ -162,7 +162,7 @@ export srctree objtree VPATH
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
 # first, and if a usermode build is happening, the "ARCH=um" on the command
 # line overrides the setting of ARCH below.  If a native build is happening,
-# then ARCH is assigned, getting whatever value it gets normally, and
+# then ARCH is assigned, getting whatever value it gets normally, and 
 # SUBARCH is subsequently ignored.
 
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
@@ -245,8 +245,13 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
-HOSTCXXFLAGS = -O2
+HOSTCFLAGS  := -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -fno-unswitch-loops -fomit-frame-pointer -std=gnu89 -pipe
+HOSTCXXFLAGS := -O3 -fno-unswitch-loops -pipe
+
+ifeq ($(shell $(HOSTCC) -v 2>&1 | grep -c "clang version"), 1)
+HOSTCFLAGS  += -Wno-unused-value -Wno-unused-parameter \
+		-Wno-missing-field-initializers -fno-delete-null-pointer-checks
+endif
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -289,7 +294,7 @@ export KBUILD_CHECKSRC KBUILD_SRC KBUILD_EXTMOD
 #         cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 #
 # If $(quiet) is empty, the whole command will be printed.
-# If it is set to "quiet_", only the short version will be printed.
+# If it is set to "quiet_", only the short version will be printed. 
 # If it is set to "silent_", nothing will be printed at all, since
 # the variable $(silent_cmd_cc_o_c) doesn't exist.
 #
@@ -356,18 +361,12 @@ CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-CFLAGS_MODULE   = -DMODULE -fno-pic \
-		  -ffast-math \
-                  -marm -mfpu=neon-vfpv4 \
-                  -mvectorize-with-neon-quad -munaligned-access
+CFLAGS_MODULE   = -fno-lto -fno-fat-lto-objects -pipe
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
-CFLAGS_KERNEL	= -mtune=cortex-a7 \
-		  -ffast-math \
-		  -ftree-slp-vectorize \
-                  -marm -mfpu=neon-vfpv4 -mvectorize-with-neon-quad -munaligned-access
+CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
-CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage -pipe
 
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
@@ -378,20 +377,26 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
                    -include $(srctree)/include/linux/kconfig.h
 
 KBUILD_CPPFLAGS := -D__KERNEL__
+	   
+KBUILD_CFLAGS := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+		  -fno-strict-aliasing -fno-common \
+		  -Werror-implicit-function-declaration \
+		  -Wno-format-security \
+		  -std=gnu89 \
+		  -march=armv7-a \
+		  -mcpu=cortex-a7 \
+		  -mtune=cortex-a7 \
+		  -mfpu=vfpv4 \
+		  -mfloat-abi=hard \
+		  -mhard-float \
+		  -mtls-dialect=gnu2 \
+		  -pipe
 
-KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-		   -fno-strict-aliasing -fno-common \
-		   -Werror-implicit-function-declaration \
-		   -Wno-format-security \
-           -Wdeclaration-after-statement \
-		   -w \
-
-		   -fno-delete-null-pointer-checks
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
-KBUILD_AFLAGS_MODULE  := -DMODULE
-KBUILD_CFLAGS_MODULE  := -DMODULE
+KBUILD_AFLAGS_MODULE  := -DMODULE -pipe
+KBUILD_CFLAGS_MODULE  := -DMODULE -pipe
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
@@ -576,16 +581,14 @@ endif # $(dot-config)
 # Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
 
+KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
+
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
+KBUILD_CFLAGS	+= -Os -mthumb $(call cc-disable-warning,maybe-uninitialized,)
+LDFLAGS += -Os --as-needed --sort-common
 else
-<<<<<<< HEAD
-KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
-=======
-<<<<<<< HEAD
-KBUILD_CFLAGS	+= -O2
-=======
-KBUILD_CFLAGS	+= -O3 -fno-unswitch-loops -marm \
+LDFLAGS += -O2 --as-needed --sort-common
+KBUILD_CFLAGS	+= -O3 -fno-unswitch-loops -marm $(call cc-disable-warning,maybe-uninitialized,) \
 		  -ftree-vectorize \
 		  -fmodulo-sched \
 		  -fmodulo-sched-allow-regmoves \
@@ -599,15 +602,24 @@ KBUILD_CFLAGS	+= -O3 -fno-unswitch-loops -marm \
 		  -ftree-loop-im \
 		  -ftree-loop-ivcanon \
 		  -fivopts \
-		  -ffat-lto-objects \
 		  -ftree-coalesce-inlined-vars \
 		  -fweb \
+		  -flto \
+		  -ffat-lto-objects \
 		  -DNDEBUG \
 		  -fdevirtualize-speculatively \
-		  -fdevirtualize-at-ltrans
+		  -fdevirtualize-at-ltrans \
+		  -fgraphite \
+		  -floop-strip-mine \
+		  -floop-block \
+		  -fgraphite-identity \
+		  -ftree-loop-linear \
+		  -floop-interchange \
+		  -floop-parallelize-all \
+		  -ftree-parallelize-loops=4 \
+		  -fcx-limited-range \
+		  -fno-signed-zeros
 
->>>>>>> 04d1e89... some LTO changes
->>>>>>> abfa895... 	some LTO changes
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
@@ -899,7 +911,7 @@ endef
 # First command is ':' to allow us to use + in front of this rule
 cmd_ksym_ld = $(cmd_vmlinux__)
 define rule_ksym_ld
-	:
+	: 
 	+$(call cmd,vmlinux_version)
 	$(call cmd,vmlinux__)
 	$(Q)echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
@@ -979,7 +991,7 @@ modpost-init := $(filter-out init/built-in.o, $(vmlinux-init))
 vmlinux.o: $(modpost-init) $(vmlinux-main) FORCE
 	$(call if_changed_rule,vmlinux-modpost)
 
-# The actual objects are generated when descending,
+# The actual objects are generated when descending, 
 # make sure no implicit rule kicks in
 $(sort $(vmlinux-init) $(vmlinux-main)) $(vmlinux-lds): $(vmlinux-dirs) ;
 
@@ -1569,7 +1581,7 @@ endif
 	$(build)=$(build-dir) $(@:.ko=.o)
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modpost
 
-# FIXME Should go into a make.lib or something
+# FIXME Should go into a make.lib or something 
 # ===========================================================================
 
 quiet_cmd_rmdirs = $(if $(wildcard $(rm-dirs)),CLEAN   $(wildcard $(rm-dirs)))
