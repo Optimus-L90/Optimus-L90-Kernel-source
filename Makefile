@@ -383,7 +383,7 @@ KBUILD_CFLAGS := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		  -Werror-implicit-function-declaration \
 		  -Wno-format-security \
 		  -std=gnu89 \
-		  -march=armv7-a \
+		  -w \
 		  -mcpu=cortex-a7 \
 		  -mtune=cortex-a7 \
 		  -mfpu=vfpv4 \
